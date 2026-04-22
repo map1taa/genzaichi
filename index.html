@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>現在地</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root {
+  --paper: #f7f3ea;
+  --ink: #2a2723;
+  --ink-soft: #6b6358;
+  --rule: #d9cdb3;
+  --rule-soft: #e7dec8;
+  --accent: #8a5a2b;
+  --sat: #3a5a7a;
+  --sun: #a84040;
+  --shadow: rgba(40, 30, 15, 0.18);
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: #d9cdb3 repeating-linear-gradient(
+    135deg,
+    rgba(0,0,0,0.015) 0 2px,
+    transparent 2px 6px
+  );
+  color: var(--ink);
+  font-family: "Yu Gothic", "YuGothic", "游ゴシック", "游ゴシック体", "Hiragino Sans", "ヒラギノ角ゴ ProN", sans-serif;
+}
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 1.2rem 2rem 0.6rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+.site-title {
+  font-size: 1.6rem;
+  letter-spacing: 0.4em;
+  margin: 0;
+  font-weight: 500;
+}
+.controls { display: flex; align-items: center; gap: 0.5rem; font-size: 0.95rem; }
+.controls button {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  padding: 0.3rem 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.controls button:hover { background: #fff9eb; }
+.controls .today-btn { margin-left: 0.5rem; }
+#week-label {
+  min-width: 11rem;
+  text-align: center;
+  color: var(--ink-soft);
+  letter-spacing: 0.1em;
+}
+.sheet {
+  max-width: 1600px;
+  margin: 1rem auto 3rem;
+  padding: 1.5rem 1.25rem;
+  background: var(--paper);
+  background-image:
+    radial-gradient(circle at 0 0, rgba(0,0,0,0.04), transparent 60%),
+    radial-gradient(circle at 100% 100%, rgba(0,0,0,0.04), transparent 60%);
+  border-radius: 4px;
+  filter: drop-shadow(0 12px 24px var(--shadow));
+}
+.day-grid {
+  display: grid;
+  grid-template-columns: 3.2rem repeat(7, 1fr);
+  border-top: 1px solid var(--rule);
+  border-left: 1px solid var(--rule);
+}
+.grid-head, .grid-cell, .grid-time {
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: 0.35rem 0.4rem;
+  min-height: 2.4rem;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+.grid-head {
+  text-align: center;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  background: var(--rule-soft);
+  padding: 0.5rem 0.3rem;
+}
+.grid-head .date {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  letter-spacing: 0.1em;
+  margin-top: 2px;
+}
+.grid-head.is-today { background: #f1d9b5; color: var(--accent); }
+.grid-head.is-sat { color: var(--sat); }
+.grid-head.is-sun { color: var(--sun); }
+.grid-time {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+  background: var(--rule-soft);
+  font-size: 0.78rem;
+  padding-right: 0.5rem;
+}
+.grid-cell { background: transparent; position: relative; transition: background 0.3s; }
+.grid-cell.is-past { background: rgba(0,0,0,0.06); }
+.grid-cell.is-past textarea { color: var(--ink-soft); }
+.grid-cell.is-now {
+  background: rgba(220, 60, 60, 0.12);
+  box-shadow: inset 0 0 0 2px #c83c3c;
+}
+.grid-cell.is-now textarea { color: #8a2222; font-weight: 500; }
+.clock {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.1rem;
+  letter-spacing: 0.15em;
+  color: var(--ink);
+  margin-right: 1rem;
+}
+.clock .date { color: var(--ink-soft); font-size: 0.85rem; margin-right: 0.5rem; }
+.gcal-btn.connected { background: #e3efd9; border-color: #8aa878; }
+.gcal-status { font-size: 0.78rem; color: var(--ink-soft); margin-left: 0.25rem; }
+.event-chip {
+  display: block;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  background: #cfe0f5;
+  color: #214775;
+  border-left: 2px solid #4a78b8;
+  padding: 1px 4px;
+  margin-bottom: 2px;
+  border-radius: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+.event-chip .t { color: #4a78b8; margin-right: 3px; font-variant-numeric: tabular-nums; }
+.grid-cell.is-now .event-chip { background: #f5d3cf; color: #751f1f; border-left-color: #b8594a; }
+.grid-cell.is-now .event-chip .t { color: #b8594a; }
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+.modal {
+  background: var(--paper); padding: 1.5rem; border-radius: 4px;
+  max-width: 480px; width: 90%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+.modal h2 { margin: 0 0 0.75rem; font-size: 1.1rem; letter-spacing: 0.1em; }
+.modal p { margin: 0.5rem 0; font-size: 0.85rem; line-height: 1.5; color: var(--ink-soft); }
+.modal input {
+  width: 100%; padding: 0.5rem; margin: 0.5rem 0;
+  border: 1px solid var(--rule); background: #fff;
+  font-family: inherit; font-size: 0.85rem;
+  border-radius: 2px;
+}
+.modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
+.grid-cell textarea {
+  width: 100%;
+  height: 100%;
+  min-height: 2rem;
+  border: none;
+  background: transparent;
+  resize: none;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: var(--ink);
+  outline: none;
+  padding: 0;
+  overflow: hidden;
+  line-height: 1.35;
+}
+.grid-cell:focus-within {
+  background: rgba(255, 240, 200, 0.45);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+@media (max-width: 900px) {
+  .sheet { padding: 1rem 0.5rem; }
+  .day-grid { grid-template-columns: 2.6rem repeat(7, minmax(5rem, 1fr)); overflow-x: auto; }
+  .site-header { padding: 1rem 1rem 0.5rem; }
+}
+</style>
+</head>
+<body>
+  <header class="site-header">
+    <h1 class="site-title">現在地</h1>
+    <div class="controls">
+      <span class="clock" id="clock" aria-live="polite"></span>
+      <button id="prev-week" aria-label="前の週">‹</button>
+      <span id="week-label"></span>
+      <button id="next-week" aria-label="次の週">›</button>
+      <button id="today" class="today-btn">今週</button>
+      <button id="gcal-btn" class="gcal-btn">Google連携</button>
+      <span id="gcal-status" class="gcal-status"></span>
+    </div>
+  </header>
+
+  <main class="sheet">
+    <div id="grid-container"></div>
+  </main>
+
+<script>
+const DAYS = ["月", "火", "水", "木", "金", "土", "日"];
+const START_HOUR = 8;
+const END_HOUR = 23;
+const STORAGE_PREFIX = "genzaichi:";
+
+const container = document.getElementById("grid-container");
+const weekLabel = document.getElementById("week-label");
+
+let currentMonday = mondayOf(new Date());
+
+function mondayOf(d) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = x.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  x.setDate(x.getDate() + diff);
+  return x;
+}
+function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function pad(n) { return String(n).padStart(2, "0"); }
+function weekKey(monday) { return `${monday.getFullYear()}-${pad(monday.getMonth()+1)}-${pad(monday.getDate())}`; }
+function isSameDay(a, b) { return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+function formatDate(d) { return `${d.getMonth()+1}/${d.getDate()}`; }
+function formatWeekLabel(monday) {
+  const sunday = addDays(monday, 6);
+  return `${monday.getFullYear()}年 ${formatDate(monday)} — ${formatDate(sunday)}`;
+}
+function cellKey(monday, dayIndex, hour) {
+  return `${STORAGE_PREFIX}${weekKey(monday)}:${dayIndex}:${hour}`;
+}
+function autosize(ta) {
+  ta.style.height = "auto";
+  ta.style.height = Math.max(ta.scrollHeight, 24) + "px";
+}
+
+function buildGrid(monday) {
+  container.innerHTML = "";
+  const grid = document.createElement("div");
+  grid.className = "day-grid";
+
+  const today = new Date();
+  const corner = document.createElement("div");
+  corner.className = "grid-head";
+  grid.appendChild(corner);
+
+  for (let i = 0; i < 7; i++) {
+    const date = addDays(monday, i);
+    const head = document.createElement("div");
+    head.className = "grid-head";
+    if (isSameDay(date, today)) head.classList.add("is-today");
+    if (i === 5) head.classList.add("is-sat");
+    if (i === 6) head.classList.add("is-sun");
+    head.innerHTML = `${DAYS[i]}<span class="date">${formatDate(date)}</span>`;
+    grid.appendChild(head);
+  }
+
+  for (let h = START_HOUR; h <= END_HOUR; h++) {
+    const t = document.createElement("div");
+    t.className = "grid-time";
+    t.textContent = `${pad(h)}:00`;
+    grid.appendChild(t);
+
+    for (let i = 0; i < 7; i++) {
+      const cell = document.createElement("div");
+      cell.className = "grid-cell";
+      cell.dataset.day = i;
+      cell.dataset.hour = h;
+      const ta = document.createElement("textarea");
+      ta.rows = 1;
+      const key = cellKey(monday, i, h);
+      ta.value = localStorage.getItem(key) || "";
+      requestAnimationFrame(() => autosize(ta));
+      ta.addEventListener("input", () => {
+        localStorage.setItem(key, ta.value);
+        autosize(ta);
+      });
+      cell.appendChild(ta);
+      grid.appendChild(cell);
+    }
+  }
+  container.appendChild(grid);
+  updateCellStates();
+}
+
+function updateCellStates() {
+  const now = new Date();
+  const cells = container.querySelectorAll(".grid-cell");
+  cells.forEach((cell) => {
+    const i = Number(cell.dataset.day);
+    const h = Number(cell.dataset.hour);
+    const cellStart = addDays(currentMonday, i);
+    cellStart.setHours(h, 0, 0, 0);
+    const cellEnd = new Date(cellStart.getTime() + 60 * 60 * 1000);
+    cell.classList.remove("is-past", "is-now");
+    if (now >= cellEnd) cell.classList.add("is-past");
+    else if (now >= cellStart) cell.classList.add("is-now");
+  });
+}
+
+function updateClock() {
+  const now = new Date();
+  const d = `${now.getMonth()+1}/${now.getDate()}(${DAYS[(now.getDay()+6)%7]})`;
+  const t = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  document.getElementById("clock").innerHTML = `<span class="date">${d}</span>${t}`;
+}
+
+function render() {
+  weekLabel.textContent = formatWeekLabel(currentMonday);
+  buildGrid(currentMonday);
+}
+
+document.getElementById("prev-week").addEventListener("click", () => { currentMonday = addDays(currentMonday, -7); render(); });
+document.getElementById("next-week").addEventListener("click", () => { currentMonday = addDays(currentMonday, 7); render(); });
+document.getElementById("today").addEventListener("click", () => { currentMonday = mondayOf(new Date()); render(); });
+
+updateClock();
+render();
+setInterval(() => { updateClock(); updateCellStates(); }, 1000);
+
+// ---------- Google Calendar integration ----------
+const GCAL_CLIENT_ID_KEY = "genzaichi:gcal_client_id";
+const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+let tokenClient = null;
+let accessToken = null;
+let tokenExpiry = 0;
+let eventsByCell = new Map();
+
+const gcalBtn = document.getElementById("gcal-btn");
+const gcalStatus = document.getElementById("gcal-status");
+
+gcalBtn.addEventListener("click", onGcalClick);
+
+function onGcalClick() {
+  if (accessToken && Date.now() < tokenExpiry) {
+    accessToken = null;
+    tokenExpiry = 0;
+    eventsByCell.clear();
+    gcalBtn.classList.remove("connected");
+    gcalBtn.textContent = "Google連携";
+    gcalStatus.textContent = "";
+    render();
+    return;
+  }
+  const clientId = localStorage.getItem(GCAL_CLIENT_ID_KEY);
+  if (!clientId) { promptClientId(); return; }
+  startAuth(clientId);
+}
+
+function promptClientId() {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal">
+      <h2>Google OAuth Client ID</h2>
+      <p>Google Cloud Console で作成した OAuth クライアント ID を貼り付けてください。<br>形式: <code>xxxxx.apps.googleusercontent.com</code></p>
+      <p>承認済み JavaScript 生成元に <code>${location.origin}</code> を追加しておく必要があります。</p>
+      <input type="text" id="client-id-input" placeholder="xxxxx.apps.googleusercontent.com" />
+      <div class="modal-actions">
+        <button id="client-id-cancel">キャンセル</button>
+        <button id="client-id-save">保存して連携</button>
+      </div>
+    </div>`;
+  document.body.appendChild(backdrop);
+  const input = backdrop.querySelector("#client-id-input");
+  input.focus();
+  backdrop.querySelector("#client-id-cancel").onclick = () => backdrop.remove();
+  backdrop.querySelector("#client-id-save").onclick = () => {
+    const v = input.value.trim();
+    if (!v) return;
+    localStorage.setItem(GCAL_CLIENT_ID_KEY, v);
+    backdrop.remove();
+    startAuth(v);
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") backdrop.querySelector("#client-id-save").click();
+    if (e.key === "Escape") backdrop.remove();
+  });
+}
+
+function startAuth(clientId) {
+  if (!window.google || !google.accounts || !google.accounts.oauth2) {
+    gcalStatus.textContent = "Google SDK 読込中...";
+    setTimeout(() => startAuth(clientId), 300);
+    return;
+  }
+  if (!tokenClient || tokenClient.__clientId !== clientId) {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: GCAL_SCOPE,
+      callback: (resp) => {
+        if (resp.error) {
+          gcalStatus.textContent = `エラー: ${resp.error}`;
+          return;
+        }
+        accessToken = resp.access_token;
+        tokenExpiry = Date.now() + (Number(resp.expires_in) - 60) * 1000;
+        gcalBtn.classList.add("connected");
+        gcalBtn.textContent = "連携解除";
+        gcalStatus.textContent = "";
+        fetchAndRenderEvents();
+      },
+    });
+    tokenClient.__clientId = clientId;
+  }
+  gcalStatus.textContent = "認証中...";
+  tokenClient.requestAccessToken({ prompt: accessToken ? "" : "consent" });
+}
+
+async function fetchAndRenderEvents() {
+  if (!accessToken) return;
+  const timeMin = new Date(currentMonday);
+  timeMin.setHours(0,0,0,0);
+  const timeMax = addDays(timeMin, 7);
+  const url = new URL("https://www.googleapis.com/calendar/v3/calendars/primary/events");
+  url.searchParams.set("timeMin", timeMin.toISOString());
+  url.searchParams.set("timeMax", timeMax.toISOString());
+  url.searchParams.set("singleEvents", "true");
+  url.searchParams.set("orderBy", "startTime");
+  url.searchParams.set("maxResults", "250");
+  try {
+    const r = await fetch(url.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!r.ok) {
+      gcalStatus.textContent = `取得失敗 (${r.status})`;
+      if (r.status === 401) { accessToken = null; tokenExpiry = 0; }
+      return;
+    }
+    const data = await r.json();
+    eventsByCell.clear();
+    (data.items || []).forEach(mapEventToCell);
+    renderEventChips();
+    gcalStatus.textContent = `${(data.items || []).length}件`;
+  } catch (e) {
+    gcalStatus.textContent = `エラー: ${e.message}`;
+  }
+}
+
+function mapEventToCell(ev) {
+  if (!ev.start) return;
+  const isAllDay = !ev.start.dateTime;
+  const start = new Date(ev.start.dateTime || ev.start.date);
+  const end = ev.end ? new Date(ev.end.dateTime || ev.end.date) : new Date(start.getTime() + 3600000);
+  const dayIndex = Math.floor((start - currentMonday) / 86400000);
+  if (dayIndex < 0 || dayIndex > 6) return;
+  const hour = isAllDay ? START_HOUR : Math.max(START_HOUR, Math.min(END_HOUR, start.getHours()));
+  const key = `${dayIndex}:${hour}`;
+  if (!eventsByCell.has(key)) eventsByCell.set(key, []);
+  eventsByCell.get(key).push({ title: ev.summary || "(無題)", start, end, isAllDay });
+}
+
+function renderEventChips() {
+  container.querySelectorAll(".event-chip").forEach(n => n.remove());
+  eventsByCell.forEach((events, key) => {
+    const [day, hour] = key.split(":");
+    const cell = container.querySelector(`.grid-cell[data-day="${day}"][data-hour="${hour}"]`);
+    if (!cell) return;
+    events.forEach(ev => {
+      const chip = document.createElement("div");
+      chip.className = "event-chip";
+      const time = ev.isAllDay ? "終日"
+        : `${pad(ev.start.getHours())}:${pad(ev.start.getMinutes())}`;
+      chip.innerHTML = `<span class="t">${time}</span>${escapeHtml(ev.title)}`;
+      chip.title = `${ev.title}\n${ev.start.toLocaleString()} – ${ev.end.toLocaleString()}`;
+      cell.insertBefore(chip, cell.firstChild);
+    });
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+
+const _origRender = render;
+render = function() { _origRender(); if (accessToken) renderEventChips(); };
+document.getElementById("prev-week").addEventListener("click", () => { if (accessToken) fetchAndRenderEvents(); });
+document.getElementById("next-week").addEventListener("click", () => { if (accessToken) fetchAndRenderEvents(); });
+document.getElementById("today").addEventListener("click", () => { if (accessToken) fetchAndRenderEvents(); });
+</script>
+</body>
+</html>
