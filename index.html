@@ -419,13 +419,13 @@ html, body {
   font-family: inherit;
 }
 
-:root { --time-col-width: 3.2rem; }
+:root { --time-col-width: 3.2rem; --todo-col-fr: 1.5fr; }
 
 @media (max-width: 900px) {
-  :root { --time-col-width: 2.5rem; }
+  :root { --time-col-width: 2.5rem; --todo-col-fr: 3fr; }
   html, body { overflow-x: hidden; }
   #grid-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .day-grid { min-width: 680px; }
+  .day-grid { min-width: 780px; }
   .sheet { padding: 0.5rem 0.25rem; }
   .site-header { padding: 0.75rem 0.75rem 0.4rem; }
   .controls { flex-wrap: wrap; row-gap: 0.3rem; font-size: 0.85rem; }
@@ -518,7 +518,7 @@ function buildGrid(monday) {
   const todayMid = new Date(today); todayMid.setHours(0,0,0,0);
   const todayIndex = Math.round((todayMid - mondayMid) / 86400000);
   const cols = Array.from({length: 7}, (_, i) => i === todayIndex ? "2fr" : "1fr").join(" ");
-  grid.style.gridTemplateColumns = `var(--time-col-width) ${cols} 1.5fr`;
+  grid.style.gridTemplateColumns = `var(--time-col-width) ${cols} var(--todo-col-fr)`;
 
   const corner = document.createElement("div");
   corner.className = "grid-head";
