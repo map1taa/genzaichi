@@ -933,6 +933,7 @@ function openTaskModal() {
 
 // ---------- Google Calendar integration ----------
 const GCAL_CLIENT_ID_KEY = "genzaichi:gcal_client_id";
+const GCAL_CONNECTED_KEY = "genzaichi:gcal_connected";
 const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
 let tokenClient = null;
 let accessToken = null;
@@ -949,6 +950,7 @@ function onGcalClick() {
     accessToken = null;
     tokenExpiry = 0;
     eventsByCell.clear();
+    localStorage.removeItem(GCAL_CONNECTED_KEY);
     gcalBtn.classList.remove("connected");
     gcalBtn.textContent = "Google連携";
     gcalStatus.textContent = "";
@@ -957,7 +959,7 @@ function onGcalClick() {
   }
   const clientId = localStorage.getItem(GCAL_CLIENT_ID_KEY);
   if (!clientId) { promptClientId(); return; }
-  startAuth(clientId);
+  startAuth(clientId, false);
 }
 
 function promptClientId() {
@@ -991,10 +993,10 @@ function promptClientId() {
   });
 }
 
-function startAuth(clientId) {
+function startAuth(clientId, silent) {
   if (!window.google || !google.accounts || !google.accounts.oauth2) {
-    gcalStatus.textContent = "Google SDK 読込中...";
-    setTimeout(() => startAuth(clientId), 300);
+    if (!silent) gcalStatus.textContent = "Google SDK 読込中...";
+    setTimeout(() => startAuth(clientId, silent), 300);
     return;
   }
   if (!tokenClient || tokenClient.__clientId !== clientId) {
@@ -1003,11 +1005,17 @@ function startAuth(clientId) {
       scope: GCAL_SCOPE,
       callback: (resp) => {
         if (resp.error) {
-          gcalStatus.textContent = `エラー: ${resp.error}`;
+          if (silent) {
+            localStorage.removeItem(GCAL_CONNECTED_KEY);
+            gcalStatus.textContent = "";
+          } else {
+            gcalStatus.textContent = `エラー: ${resp.error}`;
+          }
           return;
         }
         accessToken = resp.access_token;
         tokenExpiry = Date.now() + (Number(resp.expires_in) - 60) * 1000;
+        localStorage.setItem(GCAL_CONNECTED_KEY, "1");
         gcalBtn.classList.add("connected");
         gcalBtn.textContent = "連携解除";
         gcalStatus.textContent = "";
@@ -1016,9 +1024,16 @@ function startAuth(clientId) {
     });
     tokenClient.__clientId = clientId;
   }
-  gcalStatus.textContent = "認証中...";
-  tokenClient.requestAccessToken({ prompt: accessToken ? "" : "consent" });
+  if (!silent) gcalStatus.textContent = "認証中...";
+  const wasConnected = localStorage.getItem(GCAL_CONNECTED_KEY) === "1";
+  tokenClient.requestAccessToken({ prompt: (accessToken || wasConnected || silent) ? "" : "consent" });
 }
+
+(function autoReconnectGcal() {
+  const id = localStorage.getItem(GCAL_CLIENT_ID_KEY);
+  const was = localStorage.getItem(GCAL_CONNECTED_KEY) === "1";
+  if (id && was) startAuth(id, true);
+})();
 
 async function fetchAndRenderEvents() {
   if (!accessToken) return;
