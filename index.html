@@ -404,8 +404,10 @@ html, body {
 :root { --time-col-width: 3.2rem; }
 
 @media (max-width: 900px) {
-  :root { --time-col-width: 2.2rem; }
+  :root { --time-col-width: 2.5rem; }
   html, body { overflow-x: hidden; }
+  #grid-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .day-grid { min-width: 680px; }
   .sheet { padding: 0.5rem 0.25rem; }
   .site-header { padding: 0.75rem 0.75rem 0.4rem; }
   .controls { flex-wrap: wrap; row-gap: 0.3rem; font-size: 0.85rem; }
