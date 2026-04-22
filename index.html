@@ -263,10 +263,30 @@ html, body {
   font-family: inherit;
 }
 
+:root { --time-col-width: 3.2rem; }
+
 @media (max-width: 900px) {
-  .sheet { padding: 1rem 0.5rem; }
-  .day-grid { grid-template-columns: 2.6rem repeat(7, minmax(5rem, 1fr)); overflow-x: auto; }
-  .site-header { padding: 1rem 1rem 0.5rem; }
+  :root { --time-col-width: 2.2rem; }
+  html, body { overflow-x: hidden; }
+  .sheet { padding: 0.5rem 0.25rem; }
+  .site-header { padding: 0.75rem 0.75rem 0.4rem; }
+  .controls { flex-wrap: wrap; row-gap: 0.3rem; font-size: 0.85rem; }
+  .controls button { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
+  #week-label { min-width: 0; font-size: 0.8rem; letter-spacing: 0.05em; }
+  .clock { font-size: 0.9rem; margin-right: 0.25rem; letter-spacing: 0.05em; }
+  .clock .date { font-size: 0.72rem; margin-right: 0.25rem; }
+  .site-title { font-size: 1.2rem; letter-spacing: 0.25em; }
+  .grid-head, .grid-cell, .grid-time {
+    padding: 0.2rem 0.15rem;
+    font-size: 0.7rem;
+    min-height: 2rem;
+  }
+  .grid-head { padding: 0.3rem 0.1rem; letter-spacing: 0.05em; }
+  .grid-head .date { font-size: 0.6rem; letter-spacing: 0; margin-top: 1px; }
+  .grid-time { font-size: 0.62rem; padding-right: 0.2rem; }
+  .grid-cell textarea { font-size: 0.7rem; }
+  .event-chip, .task-chip { font-size: 0.6rem; padding: 1px 2px; }
+  .task-chip .done-chk { width: 10px; height: 10px; }
 }
 </style>
 </head>
@@ -331,6 +351,12 @@ function buildGrid(monday) {
   grid.className = "day-grid";
 
   const today = new Date();
+  const mondayMid = new Date(monday); mondayMid.setHours(0,0,0,0);
+  const todayMid = new Date(today); todayMid.setHours(0,0,0,0);
+  const todayIndex = Math.round((todayMid - mondayMid) / 86400000);
+  const cols = Array.from({length: 7}, (_, i) => i === todayIndex ? "2fr" : "1fr").join(" ");
+  grid.style.gridTemplateColumns = `var(--time-col-width) ${cols}`;
+
   const corner = document.createElement("div");
   corner.className = "grid-head";
   grid.appendChild(corner);
