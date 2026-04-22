@@ -209,6 +209,144 @@ html, body {
 .task-chip.done { opacity: 0.45; text-decoration: line-through; }
 .grid-cell.is-now .task-chip { background: #fbd5c6; border-left-color: #c83c3c; }
 
+.checklist-cell {
+  padding: 0.35rem;
+  background: rgba(255, 250, 232, 0.55);
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.checklist-items {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+}
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  padding: 2px 4px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.6);
+  line-height: 1.3;
+}
+.checklist-item.done .cl-text { text-decoration: line-through; color: var(--ink-soft); }
+.checklist-item input[type="checkbox"] { margin: 0; cursor: pointer; flex-shrink: 0; }
+.checklist-item .cl-text { flex: 1; word-break: break-word; }
+.checklist-item .cl-del {
+  background: transparent; border: none; color: var(--ink-soft);
+  cursor: pointer; padding: 0 4px; font-size: 0.9rem; line-height: 1;
+  font-family: inherit;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.checklist-item:hover .cl-del { opacity: 1; }
+.checklist-item .cl-del:hover { color: #c83c3c; }
+.checklist-add { margin-top: 0.3rem; }
+.checklist-add input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  background: #fff;
+  outline: none;
+}
+.checklist-add input:focus { border-color: var(--accent); }
+
+.year-section {
+  max-width: 1600px;
+  margin: 2rem auto 5rem;
+  padding: 1.5rem 1.25rem;
+  background: var(--paper);
+  border-radius: 4px;
+  filter: drop-shadow(0 12px 24px var(--shadow));
+}
+.year-title {
+  font-size: 1.1rem;
+  letter-spacing: 0.3em;
+  margin: 0 0 1rem;
+  text-align: center;
+  color: var(--ink);
+}
+.year-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+}
+.month {
+  font-size: 0.8rem;
+}
+.month-title {
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  margin: 0 0 0.4rem;
+  color: var(--ink);
+  text-align: center;
+  font-size: 0.85rem;
+}
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.month-head {
+  font-size: 0.65rem;
+  color: var(--ink-soft);
+  text-align: center;
+  padding: 2px 0;
+  letter-spacing: 0.05em;
+}
+.month-head.is-sat { color: var(--sat); }
+.month-head.is-sun { color: var(--sun); }
+.month-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  border-radius: 50%;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: var(--ink);
+  padding: 0;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.month-day:hover { background: rgba(0,0,0,0.06); }
+.month-day.is-other { color: #c9bea5; cursor: default; }
+.month-day.is-other:hover { background: transparent; }
+.month-day.is-sat { color: var(--sat); }
+.month-day.is-sun { color: var(--sun); }
+.month-day.is-other.is-sat,
+.month-day.is-other.is-sun { color: #d9c3b8; }
+.month-day.is-today {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.month-day.is-selected-week {
+  background: rgba(255, 200, 130, 0.5);
+  border-radius: 3px;
+}
+.month-day.is-today.is-selected-week { background: var(--accent); border-radius: 50%; }
+
+@media (max-width: 900px) {
+  .year-section { margin: 1rem 0.25rem 5rem; padding: 1rem 0.5rem; }
+  .year-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+  .month-day { font-size: 0.65rem; }
+  .month-head { font-size: 0.6rem; }
+}
+
 .fab {
   position: fixed;
   bottom: 32px;
@@ -308,6 +446,11 @@ html, body {
     <div id="grid-container"></div>
   </main>
 
+  <section class="year-section">
+    <h2 class="year-title" id="year-title">2026</h2>
+    <div class="year-grid" id="year-grid"></div>
+  </section>
+
   <button class="fab" id="task-fab" aria-label="タスクを追加">+</button>
 
 <script>
@@ -355,7 +498,7 @@ function buildGrid(monday) {
   const todayMid = new Date(today); todayMid.setHours(0,0,0,0);
   const todayIndex = Math.round((todayMid - mondayMid) / 86400000);
   const cols = Array.from({length: 7}, (_, i) => i === todayIndex ? "2fr" : "1fr").join(" ");
-  grid.style.gridTemplateColumns = `var(--time-col-width) ${cols}`;
+  grid.style.gridTemplateColumns = `var(--time-col-width) ${cols} 1.5fr`;
 
   const corner = document.createElement("div");
   corner.className = "grid-head";
@@ -371,6 +514,19 @@ function buildGrid(monday) {
     head.innerHTML = `${DAYS[i]}<span class="date">${formatDate(date)}</span>`;
     grid.appendChild(head);
   }
+
+  const clHead = document.createElement("div");
+  clHead.className = "grid-head";
+  clHead.textContent = "ToDo";
+  grid.appendChild(clHead);
+
+  const totalHours = END_HOUR - START_HOUR + 1;
+  const clCell = document.createElement("div");
+  clCell.className = "checklist-cell";
+  clCell.style.gridColumn = "9";
+  clCell.style.gridRow = `2 / ${2 + totalHours}`;
+  buildChecklistUI(clCell, monday);
+  grid.appendChild(clCell);
 
   for (let h = START_HOUR; h <= END_HOUR; h++) {
     const t = document.createElement("div");
@@ -398,6 +554,56 @@ function buildGrid(monday) {
   }
   container.appendChild(grid);
   updateCellStates();
+}
+
+function buildChecklistUI(host, monday) {
+  const key = `${STORAGE_PREFIX}checklist:${weekKey(monday)}`;
+  let items = [];
+  try { items = JSON.parse(localStorage.getItem(key)) || []; } catch {}
+
+  const list = document.createElement("div");
+  list.className = "checklist-items";
+
+  const save = () => localStorage.setItem(key, JSON.stringify(items));
+
+  const rerender = () => {
+    list.innerHTML = "";
+    items.forEach((item, idx) => {
+      const row = document.createElement("div");
+      row.className = "checklist-item" + (item.done ? " done" : "");
+      row.innerHTML = `<input type="checkbox" ${item.done ? "checked" : ""}><span class="cl-text"></span><button type="button" class="cl-del" aria-label="削除">×</button>`;
+      row.querySelector(".cl-text").textContent = item.text;
+      row.querySelector("input").addEventListener("change", (e) => {
+        items[idx].done = e.target.checked;
+        save();
+        rerender();
+      });
+      row.querySelector(".cl-del").addEventListener("click", () => {
+        items.splice(idx, 1);
+        save();
+        rerender();
+      });
+      list.appendChild(row);
+    });
+  };
+
+  const form = document.createElement("form");
+  form.className = "checklist-add";
+  form.innerHTML = `<input type="text" placeholder="＋ 追加...">`;
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = form.querySelector("input");
+    const text = input.value.trim();
+    if (!text) return;
+    items.push({ text, done: false });
+    save();
+    input.value = "";
+    rerender();
+  });
+
+  host.appendChild(list);
+  host.appendChild(form);
+  rerender();
 }
 
 function updateCellStates() {
@@ -433,7 +639,84 @@ document.getElementById("today").addEventListener("click", () => { currentMonday
 
 updateClock();
 render();
+buildYearCalendar(2026);
 setInterval(() => { updateClock(); updateCellStates(); renderTasks(); }, 1000);
+
+// ---------- Year calendar ----------
+function buildYearCalendar(year) {
+  const yearGrid = document.getElementById("year-grid");
+  document.getElementById("year-title").textContent = `${year}`;
+  yearGrid.innerHTML = "";
+  for (let m = 0; m < 12; m++) {
+    yearGrid.appendChild(buildMonth(year, m));
+  }
+  highlightSelectedWeek();
+}
+
+function buildMonth(year, month) {
+  const box = document.createElement("div");
+  box.className = "month";
+  const title = document.createElement("h3");
+  title.className = "month-title";
+  title.textContent = `${month + 1}月`;
+  box.appendChild(title);
+
+  const grid = document.createElement("div");
+  grid.className = "month-grid";
+  ["月","火","水","木","金","土","日"].forEach((d, i) => {
+    const h = document.createElement("div");
+    h.className = "month-head";
+    if (i === 5) h.classList.add("is-sat");
+    if (i === 6) h.classList.add("is-sun");
+    h.textContent = d;
+    grid.appendChild(h);
+  });
+
+  const firstOfMonth = new Date(year, month, 1);
+  const firstMonday = mondayOf(firstOfMonth);
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  for (let w = 0; w < 6; w++) {
+    for (let d = 0; d < 7; d++) {
+      const date = addDays(firstMonday, w * 7 + d);
+      const btn = document.createElement("button");
+      btn.className = "month-day";
+      btn.type = "button";
+      btn.textContent = date.getDate();
+      btn.dataset.iso = `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
+      if (date.getMonth() !== month) btn.classList.add("is-other");
+      if (d === 5) btn.classList.add("is-sat");
+      if (d === 6) btn.classList.add("is-sun");
+      if (date.getTime() === today.getTime()) btn.classList.add("is-today");
+      btn.addEventListener("click", () => {
+        if (btn.classList.contains("is-other")) return;
+        currentMonday = mondayOf(date);
+        render();
+        highlightSelectedWeek();
+        document.querySelector(".sheet").scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      grid.appendChild(btn);
+    }
+    if (addDays(firstMonday, w * 7).getMonth() > month && w > 3) break;
+  }
+  box.appendChild(grid);
+  return box;
+}
+
+function highlightSelectedWeek() {
+  const mondayIso = `${currentMonday.getFullYear()}-${pad(currentMonday.getMonth()+1)}-${pad(currentMonday.getDate())}`;
+  const weekDates = new Set();
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(currentMonday, i);
+    weekDates.add(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`);
+  }
+  document.querySelectorAll(".month-day").forEach(btn => {
+    btn.classList.toggle("is-selected-week", weekDates.has(btn.dataset.iso));
+  });
+}
+
+const _origRender3 = render;
+render = function() { _origRender3(); highlightSelectedWeek(); };
 
 // ---------- Tasks ----------
 const TASK_KEY = "genzaichi:tasks";
