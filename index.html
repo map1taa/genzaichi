@@ -188,6 +188,81 @@ html, body {
   background: rgba(255, 240, 200, 0.45);
   box-shadow: inset 0 0 0 1px var(--accent);
 }
+.task-chip {
+  display: block;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  background: #ffe4d1;
+  color: #7a3a10;
+  border-left: 2px solid #ff7a45;
+  padding: 1px 4px;
+  margin-bottom: 2px;
+  border-radius: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  position: relative;
+}
+.task-chip .t { color: #ff7a45; margin-right: 3px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.task-chip .done-chk { margin-right: 3px; vertical-align: middle; }
+.task-chip.done { opacity: 0.45; text-decoration: line-through; }
+.grid-cell.is-now .task-chip { background: #fbd5c6; border-left-color: #c83c3c; }
+
+.fab {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #ff7a45;
+  color: #fff;
+  border: none;
+  font-size: 32px;
+  font-weight: 300;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(255, 122, 69, 0.4);
+  z-index: 50;
+  font-family: inherit;
+}
+.fab:hover { transform: translateX(-50%) translateY(-2px); }
+
+.task-modal label { display: block; font-size: 0.75rem; color: var(--ink-soft); margin: 0.5rem 0 0.2rem; }
+.task-modal input[type="text"], .task-modal input[type="date"] {
+  width: 100%; padding: 0.5rem; margin: 0;
+  border: 1px solid var(--rule); background: #fff;
+  font-family: inherit; font-size: 0.9rem; border-radius: 3px;
+}
+.duration-buttons { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.25rem; }
+.duration-btn {
+  flex: 1; min-width: 60px; height: 44px;
+  border-radius: 8px; border: none;
+  font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  font-family: inherit; color: #fff;
+  transition: transform 0.1s;
+}
+.duration-btn[data-min="5"]  { background: #ff6b9d; }
+.duration-btn[data-min="15"] { background: #feca57; }
+.duration-btn[data-min="30"] { background: #1dd1a1; }
+.duration-btn[data-min="60"] { background: #5f8cff; }
+.duration-btn.selected { transform: scale(1.08); box-shadow: 0 0 0 2px #fff, 0 0 0 4px currentColor; }
+.priority-squares { display: flex; gap: 4px; margin-top: 0.25rem; }
+.priority-square {
+  flex: 1; aspect-ratio: 1; max-width: 32px;
+  border: none; border-radius: 5px; cursor: pointer;
+  background: #eee; padding: 0;
+}
+.priority-val { font-weight: 600; color: #ff7a45; margin-left: 0.4rem; }
+.task-modal .submit-btn {
+  background: #ff7a45; color: #fff; border: none;
+  padding: 0.6rem 1.2rem; border-radius: 6px;
+  font-size: 0.9rem; font-weight: 600; cursor: pointer;
+  font-family: inherit;
+}
+
 @media (max-width: 900px) {
   .sheet { padding: 1rem 0.5rem; }
   .day-grid { grid-template-columns: 2.6rem repeat(7, minmax(5rem, 1fr)); overflow-x: auto; }
@@ -212,6 +287,8 @@ html, body {
   <main class="sheet">
     <div id="grid-container"></div>
   </main>
+
+  <button class="fab" id="task-fab" aria-label="タスクを追加">+</button>
 
 <script>
 const DAYS = ["月", "火", "水", "木", "金", "土", "日"];
@@ -330,7 +407,176 @@ document.getElementById("today").addEventListener("click", () => { currentMonday
 
 updateClock();
 render();
-setInterval(() => { updateClock(); updateCellStates(); }, 1000);
+setInterval(() => { updateClock(); updateCellStates(); renderTasks(); }, 1000);
+
+// ---------- Tasks ----------
+const TASK_KEY = "genzaichi:tasks";
+let tasks = loadTasks();
+
+function loadTasks() {
+  try { return JSON.parse(localStorage.getItem(TASK_KEY)) || []; }
+  catch { return []; }
+}
+function saveTasks() { localStorage.setItem(TASK_KEY, JSON.stringify(tasks)); }
+function genId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+function daysUntil(dateStr) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const deadline = new Date(dateStr); deadline.setHours(0,0,0,0);
+  return Math.round((deadline - today) / 86400000);
+}
+function calcScore(t) {
+  const days = daysUntil(t.deadline);
+  const urgency = days <= 0 ? 10 : 10 / (days + 1);
+  return (t.priority * urgency) / Math.max(t.duration / 60, 0.1);
+}
+
+function renderTasks() {
+  container.querySelectorAll(".task-chip").forEach(n => n.remove());
+  const todayDate = new Date(); todayDate.setHours(0,0,0,0);
+  const mondayMid = new Date(currentMonday); mondayMid.setHours(0,0,0,0);
+  const dayIndex = Math.round((todayDate - mondayMid) / 86400000);
+  if (dayIndex < 0 || dayIndex > 6) return;
+
+  const sorted = tasks
+    .filter(t => !t.done)
+    .map(t => ({ ...t, score: calcScore(t) }))
+    .sort((a, b) => b.score - a.score);
+  if (sorted.length === 0) return;
+
+  const now = new Date();
+  let h = Math.max(START_HOUR, now.getHours());
+  if (h > END_HOUR) return;
+  let capacity = 60;
+
+  for (const task of sorted) {
+    while (h <= END_HOUR && task.duration > capacity) { h++; capacity = 60; }
+    if (h > END_HOUR) break;
+    const cell = container.querySelector(`.grid-cell[data-day="${dayIndex}"][data-hour="${h}"]`);
+    if (cell) {
+      const ta = cell.querySelector("textarea");
+      cell.insertBefore(makeTaskChip(task), ta);
+    }
+    capacity -= task.duration;
+  }
+  // Render done tasks greyed in-place (optional: skip since filtered above)
+}
+
+function makeTaskChip(task) {
+  const chip = document.createElement("div");
+  chip.className = "task-chip" + (task.done ? " done" : "");
+  chip.dataset.id = task.id;
+  chip.innerHTML = `<input type="checkbox" class="done-chk" ${task.done ? "checked" : ""}><span class="t">${task.duration}分</span>${escapeHtml(task.title)}`;
+  chip.title = `優先度 ${task.priority}/10 · 期限 ${task.deadline} · スコア ${calcScore(task).toFixed(1)}`;
+  return chip;
+}
+
+// Wrap render to include tasks
+const _origRender2 = render;
+render = function() {
+  _origRender2();
+  renderTasks();
+};
+
+container.addEventListener("click", (e) => {
+  const chip = e.target.closest(".task-chip");
+  if (!chip) return;
+  const id = chip.dataset.id;
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  if (e.target.classList.contains("done-chk")) {
+    task.done = e.target.checked;
+    saveTasks();
+    renderTasks();
+    return;
+  }
+  if (confirm(`「${task.title}」を削除しますか?`)) {
+    tasks = tasks.filter(t => t.id !== id);
+    saveTasks();
+    renderTasks();
+  }
+});
+
+// Task modal
+const taskFab = document.getElementById("task-fab");
+taskFab.addEventListener("click", openTaskModal);
+
+function openTaskModal() {
+  const today = new Date();
+  const defaultDate = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal task-modal">
+      <h2>タスクを追加</h2>
+      <label>やること</label>
+      <input type="text" id="t-title" placeholder="例: 資料をまとめる" />
+      <label>所要時間</label>
+      <div class="duration-buttons" id="t-duration">
+        <button type="button" class="duration-btn" data-min="5">5分</button>
+        <button type="button" class="duration-btn" data-min="15">15分</button>
+        <button type="button" class="duration-btn" data-min="30">30分</button>
+        <button type="button" class="duration-btn" data-min="60">1時間</button>
+      </div>
+      <label>期限</label>
+      <input type="date" id="t-deadline" value="${defaultDate}" />
+      <label>優先度 <span class="priority-val" id="t-priority-val">5</span></label>
+      <div class="priority-squares" id="t-priority">
+        ${Array.from({length: 10}, (_, i) => `<button type="button" class="priority-square" data-level="${i+1}"></button>`).join("")}
+      </div>
+      <div class="modal-actions">
+        <button id="t-cancel">キャンセル</button>
+        <button id="t-save" class="submit-btn">追加</button>
+      </div>
+    </div>`;
+  document.body.appendChild(backdrop);
+
+  let selectedDuration = null;
+  let selectedPriority = 5;
+  const setPriority = (lv) => {
+    selectedPriority = lv;
+    backdrop.querySelector("#t-priority-val").textContent = lv;
+    backdrop.querySelectorAll(".priority-square").forEach(sq => {
+      const v = Number(sq.dataset.level);
+      sq.style.background = v <= lv ? `hsl(0, 82%, ${72 - (v-1)*3.5}%)` : "#eee";
+    });
+  };
+  setPriority(5);
+
+  backdrop.querySelector("#t-duration").addEventListener("click", (e) => {
+    const btn = e.target.closest(".duration-btn");
+    if (!btn) return;
+    selectedDuration = Number(btn.dataset.min);
+    backdrop.querySelectorAll(".duration-btn").forEach(b => b.classList.toggle("selected", b === btn));
+  });
+  backdrop.querySelector("#t-priority").addEventListener("click", (e) => {
+    const sq = e.target.closest(".priority-square");
+    if (sq) setPriority(Number(sq.dataset.level));
+  });
+
+  const close = () => backdrop.remove();
+  backdrop.querySelector("#t-cancel").onclick = close;
+  backdrop.addEventListener("click", (e) => { if (e.target === backdrop) close(); });
+
+  backdrop.querySelector("#t-save").onclick = () => {
+    const title = backdrop.querySelector("#t-title").value.trim();
+    const deadline = backdrop.querySelector("#t-deadline").value;
+    if (!title) { backdrop.querySelector("#t-title").focus(); return; }
+    if (!selectedDuration) { alert("所要時間を選択してください"); return; }
+    if (!deadline) { alert("期限を入力してください"); return; }
+    tasks.push({
+      id: genId(), title, duration: selectedDuration, deadline,
+      priority: selectedPriority, done: false, createdAt: Date.now()
+    });
+    saveTasks();
+    renderTasks();
+    close();
+  };
+
+  backdrop.querySelector("#t-title").focus();
+}
 
 // ---------- Google Calendar integration ----------
 const GCAL_CLIENT_ID_KEY = "genzaichi:gcal_client_id";
