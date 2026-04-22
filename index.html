@@ -113,6 +113,14 @@ html, body {
   background: var(--rule-soft);
   font-size: 0.78rem;
   padding-right: 0.5rem;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+.day-grid > .grid-head:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 3;
 }
 .grid-cell { background: transparent; position: relative; transition: background 0.3s; }
 .grid-cell.is-past { background: rgba(0,0,0,0.06); }
