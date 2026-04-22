@@ -209,6 +209,24 @@ html, body {
 .task-chip.done { opacity: 0.45; text-decoration: line-through; }
 .grid-cell.is-now .task-chip { background: #fbd5c6; border-left-color: #c83c3c; }
 
+.todo-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  background: rgba(255, 250, 232, 0.55);
+}
+.todo-cell .todo-cb {
+  margin: 2px 0 0 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+.todo-cell textarea { flex: 1; }
+.todo-cell.is-done textarea {
+  text-decoration: line-through;
+  color: var(--ink-soft);
+}
+
 .checklist-cell {
   padding: 0.35rem;
   background: rgba(255, 250, 232, 0.55);
@@ -522,14 +540,6 @@ function buildGrid(monday) {
   clHead.textContent = "ToDo";
   grid.appendChild(clHead);
 
-  const totalHours = END_HOUR - START_HOUR + 1;
-  const clCell = document.createElement("div");
-  clCell.className = "checklist-cell";
-  clCell.style.gridColumn = "9";
-  clCell.style.gridRow = `2 / ${2 + totalHours}`;
-  buildChecklistUI(clCell, monday);
-  grid.appendChild(clCell);
-
   for (let h = START_HOUR; h <= END_HOUR; h++) {
     const t = document.createElement("div");
     t.className = "grid-time";
@@ -553,6 +563,30 @@ function buildGrid(monday) {
       cell.appendChild(ta);
       grid.appendChild(cell);
     }
+
+    const todoCell = document.createElement("div");
+    todoCell.className = "grid-cell todo-cell";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = "todo-cb";
+    const todoTa = document.createElement("textarea");
+    todoTa.rows = 1;
+    const tKey = `${STORAGE_PREFIX}${weekKey(monday)}:todo:${h}`;
+    let tData = { text: "", done: false };
+    try { tData = JSON.parse(localStorage.getItem(tKey)) || tData; } catch {}
+    cb.checked = tData.done;
+    todoTa.value = tData.text;
+    if (tData.done) todoCell.classList.add("is-done");
+    requestAnimationFrame(() => autosize(todoTa));
+    const syncTodo = () => {
+      localStorage.setItem(tKey, JSON.stringify({ text: todoTa.value, done: cb.checked }));
+      todoCell.classList.toggle("is-done", cb.checked);
+    };
+    cb.addEventListener("change", syncTodo);
+    todoTa.addEventListener("input", () => { syncTodo(); autosize(todoTa); });
+    todoCell.appendChild(cb);
+    todoCell.appendChild(todoTa);
+    grid.appendChild(todoCell);
   }
   container.appendChild(grid);
   updateCellStates();
